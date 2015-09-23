@@ -1,0 +1,217 @@
+<body>
+
+<style type="text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+<div class="container-fluid main-container">
+
+
+
+
+<div id="practical-machine-learning---prediction-assignment-writeup submission" class="section level1">
+<h1>Practical Machine Learning - Prediction Assignment Writeup Submission (Manoj Kumar, Coursera Online)</h1>
+<p>For this assignment I analysed all the test data and determined that what activities an individual can perform. For doing all this I used caret and randomForest concept, this will provides me results from all the test cases. I used seed value for consistent results.</p>
+<pre class="r"><code class="r"><span class="keyword"><span class="keyword">library</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">Hmisc</span></span><span class="paren"><span class="paren">)</span></span></code></pre>
+<pre><code>## Loading required package: grid
+## Loading required package: lattice
+## Loading required package: survival
+## Loading required package: splines
+## Loading required package: Formula
+## 
+## Attaching package: 'Hmisc'
+## 
+## The following objects are masked from 'package:base':
+## 
+##     format.pval, round.POSIXt, trunc.POSIXt, units</code></pre>
+<pre class="r"><code class="r"><span class="keyword"><span class="keyword">library</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">caret</span></span><span class="paren"><span class="paren">)</span></span></code></pre>
+<pre><code>## Loading required package: ggplot2
+## 
+## Attaching package: 'caret'
+## 
+## The following object is masked from 'package:survival':
+## 
+##     cluster</code></pre>
+<pre class="r"><code class="r"><span class="keyword"><span class="keyword">library</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">randomForest</span></span><span class="paren"><span class="paren">)</span></span></code></pre>
+<pre><code>## randomForest 4.6-10
+## Type rfNews() to see new features/changes/bug fixes.
+## 
+## Attaching package: 'randomForest'
+## 
+## The following object is masked from 'package:Hmisc':
+## 
+##     combine</code></pre>
+<pre class="r"><code class="r"><span class="keyword"><span class="keyword">library</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">foreach</span></span><span class="paren"><span class="paren">)</span></span>
+<span class="keyword"><span class="keyword">library</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">doParallel</span></span><span class="paren"><span class="paren">)</span></span></code></pre>
+<pre><code>## Loading required package: iterators
+## Loading required package: parallel</code></pre>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">set.seed</span></span><span class="paren"><span class="paren">(</span></span><span class="number"><span class="number">2048</span></span><span class="paren"><span class="paren">)</span></span>
+<span class="identifier"><span class="identifier">options</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">warn</span></span><span class="operator"><span class="operator">=</span></span><span class="operator"><span class="operator">-</span></span><span class="number"><span class="number">1</span></span><span class="paren"><span class="paren">)</span></span></code></pre>
+<p>Firstly, I loaded the data both from the provided training and test data provided by COURSERA link. Some values are started with a "#DIV/0!" which I replaced with NA value.</p>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">training_data</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">read.csv</span></span><span class="paren"><span class="paren">(</span></span><span class="string"><span class="string">"pml-training.csv"</span></span>, <span class="identifier"><span class="identifier">na.strings</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">c</span></span><span class="paren"><span class="paren">(</span></span><span class="string"><span class="string">"#DIV/0!"</span></span><span class="paren"><span class="paren">)</span></span> <span class="paren"><span class="paren">)</span></span>
+<span class="identifier"><span class="identifier">evaluation_data</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">read.csv</span></span><span class="paren"><span class="paren">(</span></span><span class="string"><span class="string">"pml-testing.csv"</span></span>, <span class="identifier"><span class="identifier">na.strings</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">c</span></span><span class="paren"><span class="paren">(</span></span><span class="string"><span class="string">"#DIV/0!"</span></span><span class="paren"><span class="paren">)</span></span> <span class="paren"><span class="paren">)</span></span></code></pre>
+<p>I made all columns 8to the end to be numeric.</p>
+<pre class="r"><code class="r"><span class="keyword"><span class="keyword">for</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">i</span></span> <span class="keyword"><span class="keyword">in</span></span> <span class="identifier"><span class="identifier">c</span></span><span class="paren"><span class="paren">(</span></span><span class="number"><span class="number">8</span></span><span class="operator"><span class="operator">:</span></span><span class="identifier"><span class="identifier">ncol</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">training_data</span></span><span class="paren"><span class="paren">)</span></span><span class="operator"><span class="operator">-</span></span><span class="number"><span class="number">1</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">)</span></span> <span class="paren"><span class="paren">{</span></span><span class="identifier"><span class="identifier">training_data</span></span><span class="paren"><span class="paren">[</span></span>,<span class="identifier"><span class="identifier">i</span></span><span class="paren"><span class="paren">]</span></span> <span class="operator"><span class="operator">=</span></span> <span class="identifier"><span class="identifier">as.numeric</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">as.character</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">training_data</span></span><span class="paren"><span class="paren">[</span></span>,<span class="identifier"><span class="identifier">i</span></span><span class="paren"><span class="paren">]</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">}</span></span>
+
+<span class="keyword"><span class="keyword">for</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">i</span></span> <span class="keyword"><span class="keyword">in</span></span> <span class="identifier"><span class="identifier">c</span></span><span class="paren"><span class="paren">(</span></span><span class="number"><span class="number">8</span></span><span class="operator"><span class="operator">:</span></span><span class="identifier"><span class="identifier">ncol</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">evaluation_data</span></span><span class="paren"><span class="paren">)</span></span><span class="operator"><span class="operator">-</span></span><span class="number"><span class="number">1</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">)</span></span> <span class="paren"><span class="paren">{</span></span><span class="identifier"><span class="identifier">evaluation_data</span></span><span class="paren"><span class="paren">[</span></span>,<span class="identifier"><span class="identifier">i</span></span><span class="paren"><span class="paren">]</span></span> <span class="operator"><span class="operator">=</span></span> <span class="identifier"><span class="identifier">as.numeric</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">as.character</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">evaluation_data</span></span><span class="paren"><span class="paren">[</span></span>,<span class="identifier"><span class="identifier">i</span></span><span class="paren"><span class="paren">]</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">}</span></span></code></pre>
+<p>In the database some of the columns were with blank data which are not usable for prediction. For detecting the features only the complete columns were used. I also removed user name, timestamps and windows. These are not usable for predicting the results.</p>
+<p>Determine and display out feature set..........(S1)</p>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">feature_set</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">colnames</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">training_data</span></span><span class="paren"><span class="paren">[</span></span><span class="identifier"><span class="identifier">colSums</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">is.na</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">training_data</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">)</span></span> <span class="operator"><span class="operator">==</span></span> <span class="number"><span class="number">0</span></span><span class="paren"><span class="paren">]</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">[</span></span><span class="operator"><span class="operator">-</span></span><span class="paren"><span class="paren">(</span></span><span class="number"><span class="number">1</span></span><span class="operator"><span class="operator">:</span></span><span class="number"><span class="number">7</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">]</span></span>
+<span class="identifier"><span class="identifier">model_data</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">training_data</span></span><span class="paren"><span class="paren">[</span></span><span class="identifier"><span class="identifier">feature_set</span></span><span class="paren"><span class="paren">]</span></span>
+<span class="identifier"><span class="identifier">feature_set</span></span></code></pre>
+<pre><code>##  [1] "roll_belt"            "pitch_belt"           "yaw_belt"            
+##  [4] "total_accel_belt"     "gyros_belt_x"         "gyros_belt_y"        
+##  [7] "gyros_belt_z"         "accel_belt_x"         "accel_belt_y"        
+## [10] "accel_belt_z"         "magnet_belt_x"        "magnet_belt_y"       
+## [13] "magnet_belt_z"        "roll_arm"             "pitch_arm"           
+## [16] "yaw_arm"              "total_accel_arm"      "gyros_arm_x"         
+## [19] "gyros_arm_y"          "gyros_arm_z"          "accel_arm_x"         
+## [22] "accel_arm_y"          "accel_arm_z"          "magnet_arm_x"        
+## [25] "magnet_arm_y"         "magnet_arm_z"         "roll_dumbbell"       
+## [28] "pitch_dumbbell"       "yaw_dumbbell"         "total_accel_dumbbell"
+## [31] "gyros_dumbbell_x"     "gyros_dumbbell_y"     "gyros_dumbbell_z"    
+## [34] "accel_dumbbell_x"     "accel_dumbbell_y"     "accel_dumbbell_z"    
+## [37] "magnet_dumbbell_x"    "magnet_dumbbell_y"    "magnet_dumbbell_z"   
+## [40] "roll_forearm"         "pitch_forearm"        "yaw_forearm"         
+## [43] "total_accel_forearm"  "gyros_forearm_x"      "gyros_forearm_y"     
+## [46] "gyros_forearm_z"      "accel_forearm_x"      "accel_forearm_y"     
+## [49] "accel_forearm_z"      "magnet_forearm_x"     "magnet_forearm_y"    
+## [52] "magnet_forearm_z"     "classe"</code></pre>
+<p>After (S1) we will get the model data which comes out from our feature set.</p>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">idx</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">createDataPartition</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">y</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">model_data</span></span><span class="operator"><span class="operator">$</span></span><span class="identifier"><span class="identifier">classe</span></span>, <span class="identifier"><span class="identifier">p</span></span><span class="operator"><span class="operator">=</span></span><span class="number"><span class="number">0.75</span></span>, <span class="identifier"><span class="identifier">list</span></span><span class="operator"><span class="operator">=</span></span><span class="literal"><span class="literal">FALSE</span></span> <span class="paren"><span class="paren">)</span></span>
+<span class="identifier"><span class="identifier">training</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">model_data</span></span><span class="paren"><span class="paren">[</span></span><span class="identifier"><span class="identifier">idx</span></span>,<span class="paren"><span class="paren">]</span></span>
+<span class="identifier"><span class="identifier">testing</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">model_data</span></span><span class="paren"><span class="paren">[</span></span><span class="operator"><span class="operator">-</span></span><span class="identifier"><span class="identifier">idx</span></span>,<span class="paren"><span class="paren">]</span></span></code></pre>
+<p>We now build 5 random forests with 150 trees each. We make use of parallel processing to build this model.</p>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">registerDoParallel</span></span><span class="paren"><span class="paren">(</span></span><span class="paren"><span class="paren">)</span></span>
+<span class="identifier"><span class="identifier">x</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">training</span></span><span class="paren"><span class="paren">[</span></span><span class="operator"><span class="operator">-</span></span><span class="identifier"><span class="identifier">ncol</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">training</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">]</span></span>
+<span class="identifier"><span class="identifier">y</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">training</span></span><span class="operator"><span class="operator">$</span></span><span class="identifier"><span class="identifier">classe</span></span>
+
+<span class="identifier"><span class="identifier">rf</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">foreach</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">ntree</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">rep</span></span><span class="paren"><span class="paren">(</span></span><span class="number"><span class="number">150</span></span>, <span class="number"><span class="number">6</span></span><span class="paren"><span class="paren">)</span></span>, <span class="identifier"><span class="identifier">.combine</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">randomForest</span></span><span class="operator"><span class="operator">:</span></span><span class="operator"><span class="operator">:</span></span><span class="identifier"><span class="identifier">combine</span></span>, <span class="identifier"><span class="identifier">.packages</span></span><span class="operator"><span class="operator">=</span></span><span class="string"><span class="string">'randomForest'</span></span><span class="paren"><span class="paren">)</span></span> <span class="operator"><span class="operator">%dopar%</span></span> <span class="paren"><span class="paren">{</span></span>
+<span class="identifier"><span class="identifier">randomForest</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">x</span></span>, <span class="identifier"><span class="identifier">y</span></span>, <span class="identifier"><span class="identifier">ntree</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">ntree</span></span><span class="paren"><span class="paren">)</span></span> 
+<span class="paren"><span class="paren">}</span></span></code></pre>
+<p>Provide error reports for both training and test data.</p>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">predictions1</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">predict</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">rf</span></span>, <span class="identifier"><span class="identifier">newdata</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">training</span></span><span class="paren"><span class="paren">)</span></span>
+<span class="identifier"><span class="identifier">confusionMatrix</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">predictions1</span></span>,<span class="identifier"><span class="identifier">training</span></span><span class="operator"><span class="operator">$</span></span><span class="identifier"><span class="identifier">classe</span></span><span class="paren"><span class="paren">)</span></span></code></pre>
+<pre><code>## 
+## Attaching package: 'e1071'
+## 
+## The following object is masked from 'package:Hmisc':
+## 
+##     impute</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 4185    0    0    0    0
+##          B    0 2848    0    0    0
+##          C    0    0 2567    0    0
+##          D    0    0    0 2412    0
+##          E    0    0    0    0 2706
+## 
+## Overall Statistics
+##                                 
+##                Accuracy : 1     
+##                  95% CI : (1, 1)
+##     No Information Rate : 0.284 
+##     P-Value [Acc &gt; NIR] : &lt;2e-16
+##                                 
+##                   Kappa : 1     
+##  Mcnemar's Test P-Value : NA    
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity             1.000    1.000    1.000    1.000    1.000
+## Specificity             1.000    1.000    1.000    1.000    1.000
+## Pos Pred Value          1.000    1.000    1.000    1.000    1.000
+## Neg Pred Value          1.000    1.000    1.000    1.000    1.000
+## Prevalence              0.284    0.194    0.174    0.164    0.184
+## Detection Rate          0.284    0.194    0.174    0.164    0.184
+## Detection Prevalence    0.284    0.194    0.174    0.164    0.184
+## Balanced Accuracy       1.000    1.000    1.000    1.000    1.000</code></pre>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">predictions2</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">predict</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">rf</span></span>, <span class="identifier"><span class="identifier">newdata</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">testing</span></span><span class="paren"><span class="paren">)</span></span>
+<span class="identifier"><span class="identifier">confusionMatrix</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">predictions2</span></span>,<span class="identifier"><span class="identifier">testing</span></span><span class="operator"><span class="operator">$</span></span><span class="identifier"><span class="identifier">classe</span></span><span class="paren"><span class="paren">)</span></span></code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1395    4    0    0    0
+##          B    0  942    6    0    0
+##          C    0    3  848    9    2
+##          D    0    0    1  795    1
+##          E    0    0    0    0  898
+## 
+## Overall Statistics
+##                                         
+##                Accuracy : 0.995         
+##                  95% CI : (0.992, 0.997)
+##     No Information Rate : 0.284         
+##     P-Value [Acc &gt; NIR] : &lt;2e-16        
+##                                         
+##                   Kappa : 0.993         
+##  Mcnemar's Test P-Value : NA            
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity             1.000    0.993    0.992    0.989    0.997
+## Specificity             0.999    0.998    0.997    1.000    1.000
+## Pos Pred Value          0.997    0.994    0.984    0.997    1.000
+## Neg Pred Value          1.000    0.998    0.998    0.998    0.999
+## Prevalence              0.284    0.194    0.174    0.164    0.184
+## Detection Rate          0.284    0.192    0.173    0.162    0.183
+## Detection Prevalence    0.285    0.193    0.176    0.163    0.183
+## Balanced Accuracy       0.999    0.996    0.994    0.994    0.998</code></pre>
+<div id="conclusions-and-test-data-submit Results" class="section level2">
+<h2>Conclusions and Test Data Solution</h2>
+<p>We can see from the confusion matrix that this model is very accurate. Because my test data was around 99% accurate I expected nearly all of the submitted test cases to be correct. It turned out they were all correct.</p>
+<p>Prepare the submission. (using COURSERA provided code)</p>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">pml_write_files</span></span> <span class="operator"><span class="operator">=</span></span> <span class="keyword"><span class="keyword">function</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">x</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">{</span></span>
+  <span class="identifier"><span class="identifier">n</span></span> <span class="operator"><span class="operator">=</span></span> <span class="identifier"><span class="identifier">length</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">x</span></span><span class="paren"><span class="paren">)</span></span>
+  <span class="keyword"><span class="keyword">for</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">i</span></span> <span class="keyword"><span class="keyword">in</span></span> <span class="number"><span class="number">1</span></span><span class="operator"><span class="operator">:</span></span><span class="identifier"><span class="identifier">n</span></span><span class="paren"><span class="paren">)</span></span><span class="paren"><span class="paren">{</span></span>
+    <span class="identifier"><span class="identifier">filename</span></span> <span class="operator"><span class="operator">=</span></span> <span class="identifier"><span class="identifier">paste0</span></span><span class="paren"><span class="paren">(</span></span><span class="string"><span class="string">"problem_id_"</span></span>,<span class="identifier"><span class="identifier">i</span></span>,<span class="string"><span class="string">".txt"</span></span><span class="paren"><span class="paren">)</span></span>
+    <span class="identifier"><span class="identifier">write.table</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">x</span></span><span class="paren"><span class="paren">[</span></span><span class="identifier"><span class="identifier">i</span></span><span class="paren"><span class="paren">]</span></span>,<span class="identifier"><span class="identifier">file</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">filename</span></span>,<span class="identifier"><span class="identifier">quote</span></span><span class="operator"><span class="operator">=</span></span><span class="literal"><span class="literal">FALSE</span></span>,<span class="identifier"><span class="identifier">row.names</span></span><span class="operator"><span class="operator">=</span></span><span class="literal"><span class="literal">FALSE</span></span>,<span class="identifier"><span class="identifier">col.names</span></span><span class="operator"><span class="operator">=</span></span><span class="literal"><span class="literal">FALSE</span></span><span class="paren"><span class="paren">)</span></span>
+  <span class="paren"><span class="paren">}</span></span>
+<span class="paren"><span class="paren">}</span></span>
+
+
+<span class="identifier"><span class="identifier">x</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">evaluation_data</span></span>
+<span class="identifier"><span class="identifier">x</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">x</span></span><span class="paren"><span class="paren">[</span></span><span class="identifier"><span class="identifier">feature_set</span></span><span class="paren"><span class="paren">[</span></span><span class="identifier"><span class="identifier">feature_set</span></span><span class="operator"><span class="operator">!=</span></span><span class="string"><span class="string">'classe'</span></span><span class="paren"><span class="paren">]</span></span><span class="paren"><span class="paren">]</span></span>
+<span class="identifier"><span class="identifier">answers</span></span> <span class="operator"><span class="operator">&lt;-</span></span> <span class="identifier"><span class="identifier">predict</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">rf</span></span>, <span class="identifier"><span class="identifier">newdata</span></span><span class="operator"><span class="operator">=</span></span><span class="identifier"><span class="identifier">x</span></span><span class="paren"><span class="paren">)</span></span>
+
+<span class="identifier"><span class="identifier">answers</span></span></code></pre>
+<pre><code>##  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
+##  B  A  B  A  A  E  D  B  A  A  B  C  B  A  E  E  A  B  B  B 
+## Levels: A B C D E</code></pre>
+<pre class="r"><code class="r"><span class="identifier"><span class="identifier">pml_write_files</span></span><span class="paren"><span class="paren">(</span></span><span class="identifier"><span class="identifier">answers</span></span><span class="paren"><span class="paren">)</span></span></code></pre>
+</div>
+</div>
+
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+$(document).ready(function () {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+});
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with --self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://c328740.ssl.cf1.rackcdn.com/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+
+
+</body>
